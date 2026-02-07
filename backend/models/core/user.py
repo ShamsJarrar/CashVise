@@ -11,7 +11,7 @@ class User(Base):
     name = Column(String(100), nullable=False)
     country = Column(String(100), nullable=False)
     city = Column(String(100), nullable=False)
-    default_currency = Column(String(100), nullable=False)
+    preferred_currency = Column(String(100), nullable=False)
 
     # email verification
     is_verified = Column(Boolean, default=False)
@@ -23,3 +23,8 @@ class User(Base):
     expenses = relationship("Expense", back_populates="user")
     income = relationship("Income", back_populates="user")
     recurrence_series = relationship("RecurrenceSeries", back_populates="user")
+    insights = relationship("Insight", back_populates="user")
+    forecasts = relationship("Forecast", back_populates="user")
+
+    billing_customer = relationship("BillingCustomer", back_populates="user")
+    subscriptions = relationship("Subscription", back_populates="user")

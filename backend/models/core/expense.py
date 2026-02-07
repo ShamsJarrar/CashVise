@@ -10,8 +10,8 @@ class Expense(Base):
     date = Column(Date, nullable=False)
     bulk = Column(Boolean, nullable=False, server_default=text("false"))
     expense_category = Column(String(255), nullable=False)
-    amount = Column(Numeric(12, 2), nullable=False)
-    currency = Column(String(100), nullable=False)
+    preferred_currency_amount = Column(Numeric(12, 2), nullable=False)
+    usd_amount = Column(Numeric(12, 2), nullable=False)
     recurrence_series_id = Column(Integer, ForeignKey("recurrence_series.series_id", ondelete="SET NULL"), 
                                         nullable=True, index=True)
 

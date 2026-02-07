@@ -11,3 +11,4 @@ class InsightClass(Base):
 
     # relations
     user_insight_prefs = relationship("UserInsightPref", back_populates="insight_class")
+    insights = relationship("Insight", back_populates="insight_class")
