@@ -6,6 +6,7 @@ class InsightClass(Base):
     __tablename__ = "insight_classes"
 
     insight_class_id = Column(Integer, primary_key=True, index=True)
+    key = Column(String(100), unique=True, nullable=False, index=True)
     name = Column(String(100), unique=True, nullable=False, index=True)
     is_builtin = Column(Boolean, nullable=False, server_default=text("true"))
 

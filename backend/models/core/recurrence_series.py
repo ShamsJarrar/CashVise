@@ -9,6 +9,7 @@ class SeriesType(str, enum.Enum):
 
 class Frequency(str, enum.Enum):
     DAILY = "DAILY"
+    WEEKLY = "WEEKLY"
     MONTHLY = "MONTHLY"
     YEARLY = "YEARLY"
 
@@ -18,7 +19,7 @@ class RecurrenceSeries(Base):
     series_id = Column(Integer, primary_key=True, index=True)
     user_id =  Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     series_type = Column(Enum(SeriesType, name="series_type"), nullable=False)
-    frequency = Column(Enum(Frequency, name="frequency"), nullable=False, server_default=text("'NONE'"))
+    frequency = Column(Enum(Frequency, name="frequency"), nullable=False, server_default=text("'MONTHLY'"))
     bulk = Column(Boolean, nullable=False, server_default=text("false"))
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=True)

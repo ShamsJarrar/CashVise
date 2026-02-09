@@ -26,5 +26,5 @@ class Income(Base):
         "recurrence_series_id",
         "date",
         name="uq_income_series_date"
-    )
+    ),
 )

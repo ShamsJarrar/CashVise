@@ -26,5 +26,5 @@ class Expense(Base):
         "recurrence_series_id",
         "date",
         name="uq_expense_series_date"
-    )
+    ),
 )
