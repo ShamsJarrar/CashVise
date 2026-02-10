@@ -10,7 +10,7 @@ class User(Base):
     password = Column(String(255), nullable=False)
     name = Column(String(100), nullable=False)
     country = Column(String(100), nullable=False)
-    city = Column(String(100), nullable=False)
+    city = Column(String(100))
     preferred_currency = Column(String(100), nullable=False)
 
     # email verification

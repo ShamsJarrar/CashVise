@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 
 class TokenPayload(BaseModel):
@@ -9,3 +9,6 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
+class OTPVerifyRequest(BaseModel):
+    email: EmailStr
+    otp: str
