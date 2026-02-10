@@ -6,3 +6,4 @@ alembic==1.18.1
 psycopg2-binary==2.9.11
 python-dotenv==1.2.1
 passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.5.0
