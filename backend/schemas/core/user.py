@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional
+from .token import TokenResponse
 
 class UserCreate(BaseModel):
     email: EmailStr
@@ -16,7 +17,6 @@ class UserResponse(BaseModel):
     country: str
     city: Optional[str] = None
     preferred_currency: str
-    #TODO: check if need to add is_verified
 
     class Config:
         from_attributes = True
@@ -24,3 +24,6 @@ class UserResponse(BaseModel):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
+class TokenWithUserResponse(TokenResponse):
+    user: UserResponse

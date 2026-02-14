@@ -25,9 +25,9 @@ def hash_password(password: str) -> str:
     logger.debug("Hashing password")
     return pwd_context.hash(password)
 
-def verify_password(og_password: str, hashed_password: str) -> bool:
+def verify_password(entered_password: str, hashed_password: str) -> bool:
     logger.debug("Verifying password")
-    return pwd_context.verify(og_password, hashed_password)
+    return pwd_context.verify(entered_password, hashed_password)
 
 
 def create_access_token(data: dict) -> str:

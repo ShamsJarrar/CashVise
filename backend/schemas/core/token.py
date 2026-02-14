@@ -12,3 +12,6 @@ class TokenResponse(BaseModel):
 class OTPVerifyRequest(BaseModel):
     email: EmailStr
     otp: str
+
+class ResendOTPRequest(BaseModel):
+    email: EmailStr
