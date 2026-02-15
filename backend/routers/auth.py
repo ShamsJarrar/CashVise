@@ -16,11 +16,11 @@ router = APIRouter(prefix='/auth', tags=['Auth'])
 @router.post('/register', response_model=UserResponse)
 def register(user: UserCreate, db: Session = Depends(get_db)):
     email = normalize_string(user.email)
-    name = normalize_string(user.name)
+    name = user.name
 
     user_exists = db.query(User).filter(User.email == email).first()
     if user_exists and not user_exists.is_verified:
-        logger.warning("User email already registered but is not verified, OTP resent")
+        logger.warning("User email already registered but is not verified")
 
         return JSONResponse(
             status_code=status.HTTP_202_ACCEPTED,
@@ -44,7 +44,7 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 
     password = hash_password(user.password)
     otp = generate_otp()
-    hashed_otp = hash_otp(otp)
+    hashed_otp = hash_otp(otp, email)
     expiration = datetime.now(timezone.utc) + timedelta(minutes=10)
 
     new_user = User(
@@ -62,7 +62,7 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
 
-    send_otp(email, otp)
+    send_otp(email, name, otp)
 
     logger.info(f"New user registered and verification is pending")
     return new_user
@@ -95,7 +95,7 @@ def login(user_info: UserLogin, db: Session = Depends(get_db)):
     
     token = create_access_token(data={"sub":str(user.user_id)})
 
-    logger.info("User logged in successfully")
+    logger.info(f"User {user.user_id} logged in successfully")
     return TokenWithUserResponse(access_token=token, user=user)
 
 
@@ -187,7 +187,7 @@ def resend_otp(data: ResendOTPRequest, db: Session = Depends(get_db)):
         }
     
     otp = generate_otp()
-    hashed_otp = hash_otp(otp)
+    hashed_otp = hash_otp(otp, email)
     expiration = datetime.now(timezone.utc) + timedelta(minutes=10)
 
     user.otp_code = hashed_otp
@@ -195,7 +195,9 @@ def resend_otp(data: ResendOTPRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
-    send_otp(email, otp)
+    name = user.name
+
+    send_otp(email, name, otp)
 
     logger.info("OTP resent to user")
     return {

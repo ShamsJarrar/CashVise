@@ -15,8 +15,8 @@ class User(Base):
 
     # email verification
     is_verified = Column(Boolean, default=False)
-    otp_code = Column(String(6), nullable=True)
-    otp_expiration = Column(DateTime, nullable=True)
+    otp_code = Column(String(255), nullable=True)
+    otp_expiration = Column(DateTime(timezone=True), nullable=True)
 
     # relations
     user_insight_prefs = relationship("UserInsightPref", back_populates="user")

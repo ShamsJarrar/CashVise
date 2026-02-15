@@ -11,10 +11,11 @@ import os
 
 
 load_dotenv()
-JWT_SECRET_KEY = os.getenv("JWTSECRET_KEY")
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINS = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINS", 30))
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+SENDGRID_TEMPLATE_ID = os.getenv("SENDGRID_TEMPLATE_ID")
 FROM_EMAIL = os.getenv("FROM_EMAIL")
 OTP_SECRET_KEY = os.getenv("OTP_SECRET_KEY")
 
@@ -64,13 +65,18 @@ def verify_otp(given_otp: str, email: str, stored_otp_hash: str) -> bool:
     given_otp_hash = hash_otp(given_otp, email)
     return hmac.compare_digest(given_otp_hash, stored_otp_hash)
 
-def send_otp(email: str, otp: str):
+def send_otp(email: str, name: str, otp: str):
     message = Mail(
         from_email=FROM_EMAIL,
         to_emails=email,
-        subject="Email Verification - CashVise",
-        plain_text_content=f"Your OTP code is: {otp}. It will expire in 10 minutes."
+        subject="Your verification code"
     )
+    message.template_id = SENDGRID_TEMPLATE_ID
+    message.dynamic_template_data = {
+        "name": name or "User",
+        "otp": otp,
+    }
+
     try:
         sg = SendGridAPIClient(SENDGRID_API_KEY)
         response = sg.send(message)
