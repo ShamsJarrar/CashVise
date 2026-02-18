@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from dependencies import get_db
+from dependencies import get_db, get_current_user
 from models.core.user import User
-from schemas.core.user import UserCreate, UserResponse, UserLogin, TokenWithUserResponse
+from schemas.core.user import UserCreate, UserResponse, UserLogin, TokenWithUserResponse, UserPasswordChange, UserEmailChange
 from schemas.core.token import OTPVerifyRequest, ResendOTPRequest
 from utils.helpers import normalize_string
 from utils.logger import logger
@@ -99,7 +99,7 @@ def login(user_info: UserLogin, db: Session = Depends(get_db)):
     return TokenWithUserResponse(access_token=token, user=user)
 
 
-@router.post("/verify-email-otp")
+@router.post("/verify-email-otp", status_code=status.HTTP_200_OK)
 def verify_email_otp(data: OTPVerifyRequest, db: Session = Depends(get_db)):
     email = normalize_string(data.email)
     user = db.query(User).filter(User.email == email).first()
@@ -164,7 +164,7 @@ def verify_email_otp(data: OTPVerifyRequest, db: Session = Depends(get_db)):
         }
 
 
-@router.post('/resend-otp')
+@router.post('/resend-otp', status_code=status.HTTP_200_OK)
 def resend_otp(data: ResendOTPRequest, db: Session = Depends(get_db)):
     email = normalize_string(data.email)
     user = db.query(User).filter(User.email == email).first()
@@ -204,3 +204,104 @@ def resend_otp(data: ResendOTPRequest, db: Session = Depends(get_db)):
         "status": "OTP_RESENT",
         "message": "OTP resent successfully."
     }
+
+
+@router.patch('/change-password', status_code=status.HTTP_200_OK)
+def change_password(
+    password_info: UserPasswordChange, 
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    
+    if not verify_password(password_info.old_password, user.password):
+        logger.warning(f"User is trying to change their password, but entered wrong password")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "WRONG_PASSWORD",
+                "message": "Wrong old password is entered"
+            }
+        )
+    
+    if password_info.old_password == password_info.new_password:
+        logger.warning(f"User is using the same password to change their password")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "SAME_PASSWORD",
+                "message": "Same password is entered"
+            }
+        )
+    
+    user.password = hash_password(password_info.new_password)
+    db.commit()
+    db.refresh(user)
+
+    logger.info("User's {user.user_id} password changed successfully")
+    return {
+            "status": "PASSWORD_CHANGED",
+            "message": "Password changed successfully."
+        }
+
+
+
+# TO BE MODIFIED LATER
+# @router.patch('/change-email', status_code=status.HTTP_200_OK)
+# def change_email(
+#     email_info: UserEmailChange,
+#     db: Session = Depends(get_db),
+#     user: User = Depends(get_current_user)
+# ):
+
+#     if not verify_password(email_info.current_password, user.password):
+#         logger.warning("Invalid credentials, unable to change email")
+#         raise HTTPException(
+#             status_code=status.HTTP_403_FORBIDDEN,
+#             detail={
+#                 "status": "INVALID_CREDENTIALS",
+#                 "message": "Invalid credentials, can't change email"
+#             }
+#         )
+    
+#     new_email = normalize_string(email_info.new_email)
+#     if new_email == user.email:
+#         logger.warning(f"User is using the same email to change their email")
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail={
+#                 "code": "SAME_EMAIL",
+#                 "message": "Same email is entered"
+#             }
+#         )
+    
+#     email_unique = db.query(User).filter(User.email == new_email).first()
+#     if email_unique is not None:
+#         logger.warning("Email already registered")
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail={
+#                 "status": "EMAIL_NOT_UNIQUE",
+#                 "message": "Please use an email that has not been registered before"
+#             }
+#         )
+    
+#     user.email = new_email
+#     user.is_verified = False
+
+#     otp = generate_otp()
+#     hashed_otp = hash_otp(otp, new_email)
+#     expiration = datetime.now(timezone.utc) + timedelta(minutes=10)
+#     user.otp_code = hashed_otp
+#     user.otp_expiration = expiration
+
+#     db.commit()
+#     db.refresh(user)
+
+#     logger.info(f"User {user.user_id}'s email successfully changed, pending verification")
+#     return JSONResponse(
+#             status_code=status.HTTP_202_ACCEPTED,
+#             content={
+#                 "code": "EMAIL_CHANGED",
+#                 "message": "Email changed, please verify account.",
+#             }
+#         )
