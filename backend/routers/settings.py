@@ -23,19 +23,19 @@ def update_user_info(
 
     updated = False
     
-    if updated_info.name is not None:
+    if (updated_info.name is not None) and (updated_info.name != ""):
         user.name = updated_info.name
         updated = True
     
-    if updated_info.country is not None:
+    if (updated_info.country is not None) and (updated_info.country != ""):
         user.country =  updated_info.country
         updated = True
     
-    if updated_info.city is not None:
+    if (updated_info.city is not None) and (updated_info.city != ""):
         user.city = updated_info.city
         updated = True
     
-    if updated_info.preferred_currency is not None:
+    if (updated_info.preferred_currency is not None) and (updated_info.preferred_currency != ""):
         user.preferred_currency = updated_info.preferred_currency
         updated = True
     
@@ -67,7 +67,7 @@ def get_user_prefs(
             InsightClass.key,
             InsightClass.name,
             InsightClass.is_builtin,
-            UserInsightPref.enable.label('enabled')
+            UserInsightPref.enable
         )
         .outerjoin(
             UserInsightPref,
@@ -87,8 +87,8 @@ def get_user_prefs(
             insight_class_id=ip.insight_class_id,
             key=ip.key,
             name=ip.name,
-            is_builtin=ip.is_is_builtin,
-            enabled=True if ip.enabled is None else ip.enabled
+            is_builtin=ip.is_builtin,
+            enable=True if ip.enable is None else ip.enable
         )
         for ip in builtin_insight_classes
     ]
@@ -103,7 +103,7 @@ def update_user_prefs(
 
     if not user_updates.updates:
         logger.warning("No updates provided")
-        return HTTPException(
+        raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "status": "NO_UPDATES_PROVIDED",
@@ -145,16 +145,18 @@ def update_user_prefs(
     for u in user_updates.updates:
         key = u.key
         insight_class = get_class_by_key[key]
-        pref_exists = get_pref_by_class_id[insight_class.insight_class_id]
+        pref_exists = get_pref_by_class_id.get(insight_class.insight_class_id)
 
         if pref_exists:
-            pref_exists.enable = u.enabled
+            pref_exists.enable = u.enable
         else:
             new_user_pref = UserInsightPref(
                 user_id=user.user_id,
                 insight_class_id=insight_class.insight_class_id,
-                enable=u.enabled
+                enable=u.enable
             )
+            db.add(new_user_pref)
+            get_pref_by_class_id[insight_class.insight_class_id] = new_user_pref
         
     db.commit()
     logger.info(f"User {user.user_id}'s prefs updated successfully")

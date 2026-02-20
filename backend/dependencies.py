@@ -9,7 +9,7 @@ from jose import JWTError
 from utils.logger import logger
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 
 def get_db():

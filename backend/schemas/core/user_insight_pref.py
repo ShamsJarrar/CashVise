@@ -3,7 +3,7 @@ from typing import List
 
 class UserInsightPrefUpdateItem(BaseModel):
     key: str       
-    enabled: bool
+    enable: bool
 
 class UserInsightPrefUpdate(BaseModel):
     updates: List[UserInsightPrefUpdateItem]
@@ -13,4 +13,4 @@ class UserInsightPrefResponse(BaseModel):
     key: str
     name: str
     is_builtin: bool
-    enabled: bool
+    enable: bool

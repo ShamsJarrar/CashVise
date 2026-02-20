@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from dependencies import get_db, get_current_user
 from models.core.user import User
 from schemas.core.user import UserCreate, UserResponse, UserLogin, TokenWithUserResponse, UserPasswordChange, UserEmailChange
-from schemas.core.token import OTPVerifyRequest, ResendOTPRequest
+from schemas.core.token import OTPVerifyRequest, ResendOTPRequest, TokenResponse
 from utils.helpers import normalize_string
 from utils.logger import logger
 from utils.security import hash_password, generate_otp, hash_otp, send_otp, verify_password, create_access_token, verify_otp
@@ -66,6 +67,37 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 
     logger.info(f"New user registered and verification is pending")
     return new_user
+
+
+@router.post('/token', response_model=TokenResponse)        # Endpoint for swagger auth
+def token(data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    email = normalize_string(data.username)
+    
+    user = db.query(User).filter(User.email == email).first()
+    if user is None or not verify_password(data.password, user.password):
+        logger.warning("Invalid Credentials while trying to login!")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail={
+                "code": "INVALID_CREDENTIALS",
+                "message": "Invalid email or password"
+            }
+        )
+    
+    if not user.is_verified:
+        logger.warning("User is not verified and is trying to login")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "EMAIL_NOT_VERIFIED",
+                "message": "Please verify your email before logging in"
+            }
+        )
+    
+    token = create_access_token(data={"sub":str(user.user_id)})
+
+    logger.info(f"User {user.user_id} created access token")
+    return TokenResponse(access_token=token)
 
 
 @router.post('/login', response_model=TokenWithUserResponse)
