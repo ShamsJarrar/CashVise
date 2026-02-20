@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import List
+from .insight_class import InsightClass
 
 class UserInsightPrefUpdateItem(BaseModel):
     key: str       
@@ -8,9 +9,5 @@ class UserInsightPrefUpdateItem(BaseModel):
 class UserInsightPrefUpdate(BaseModel):
     updates: List[UserInsightPrefUpdateItem]
 
-class UserInsightPrefResponse(BaseModel):
-    insight_class_id: int
-    key: str
-    name: str
-    is_builtin: bool
+class UserInsightPrefResponse(InsightClass):
     enable: bool

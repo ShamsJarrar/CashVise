@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from routers import auth, settings
+from routers import auth, settings, insight_classes
 from dependencies import get_db
 
 app = FastAPI()
@@ -18,6 +18,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(settings.router)
+app.include_router(insight_classes.router)
 
 @app.get("/")
 def root():
