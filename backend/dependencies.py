@@ -4,6 +4,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from models.core.user import User
 from schemas.core.token import TokenPayload
+from services.fx_service import fx_service
 from utils.security import decode_access_token
 from jose import JWTError
 from utils.logger import logger
@@ -45,3 +46,7 @@ def get_current_user(
             detail="User does not exist"
         )
     return user
+
+
+def get_fx_service():
+    return fx_service

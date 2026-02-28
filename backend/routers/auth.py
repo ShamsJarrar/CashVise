@@ -8,7 +8,8 @@ from schemas.core.user import UserCreate, UserResponse, UserLogin, TokenWithUser
 from schemas.core.token import OTPVerifyRequest, ResendOTPRequest, TokenResponse
 from utils.helpers import normalize_string
 from utils.logger import logger
-from utils.security import hash_password, generate_otp, hash_otp, send_otp, verify_password, create_access_token, verify_otp
+from utils.security import hash_password, generate_otp, hash_otp, verify_password, create_access_token, verify_otp
+from services.email_service import send_otp
 from datetime import datetime, timedelta, timezone
 
 router = APIRouter(prefix='/auth', tags=['Auth'])

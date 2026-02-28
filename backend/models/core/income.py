@@ -10,9 +10,11 @@ class Income(Base):
     date = Column(Date, nullable=False)
     bulk = Column(Boolean, nullable=False, server_default=text("false"))
     source = Column(String(255), nullable=False)
-    currency = Column(String(100), nullable=False)          # Set to preferred_currency from settings by default by the frontend
-    preferred_currency_amount = Column(Numeric(12, 2), nullable=False)
+    currency = Column(String(100), nullable=False)          # Currency the user is entering the amount in, if none, set to preferred currency from settings by frontend
+    original_amount = Column(Numeric(12, 2), nullable=False)
     usd_amount = Column(Numeric(12, 2), nullable=False)
+    fx_rate_to_usd = Column(Numeric(18, 8), nullable=True)
+    fx_date = Column(Date, nullable=True)
     recurrence_series_id = Column(Integer, ForeignKey("recurrence_series.series_id", ondelete="SET NULL"), 
                                         nullable=True, index=True)
 
