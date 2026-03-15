@@ -6,6 +6,7 @@ from schemas.core.fx import FXRate, SupportedCodes, ConversionResponse
 from services.fx_service import FXService
 from decimal import Decimal
 from utils.logger import logger
+from datetime import date
 
 router = APIRouter(prefix='/fx', tags=['FX'])
 
@@ -13,12 +14,13 @@ router = APIRouter(prefix='/fx', tags=['FX'])
 async def get_rate(
     from_currency: str = Query(..., examples="USD"),
     to_currency: str = Query(..., examples="AED"),
+    date_of_rate: date = Query(..., examples="YYYY-MM-DD"),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
     fx_service: FXService = Depends(get_fx_service)
 ):
 
-    rate = await fx_service.get_latest_rate(db, from_currency, to_currency)
+    rate = await fx_service.get_rate(db, from_currency, to_currency, date_of_rate)
 
     logger.info(f"Returning exchange rate for {from_currency}-{to_currency}")
     return FXRate(rate=rate)
@@ -29,12 +31,13 @@ async def get_conversion(
     from_currency: str = Query(..., examples="USD"),
     to_currency: str = Query(..., examples="AED"),
     amount: Decimal = Query(...),
+    date_of_rate: date = Query(..., examples="YYYY-MM-DD"),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
     fx_service: FXService = Depends(get_fx_service)
 ):
 
-    data = await fx_service.convert(db, from_currency, to_currency, amount)
+    data = await fx_service.convert(db, from_currency, to_currency, amount, date_of_rate)
 
     logger.info(f"Returning converted amount and rate for {from_currency}-{to_currency}")
     return ConversionResponse(rate=data['rate'], amount=data['amount'])

@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Dict
 from decimal import Decimal
 
 class FXRate(BaseModel):
@@ -10,4 +10,4 @@ class ConversionResponse(BaseModel):
     amount: Decimal
 
 class SupportedCodes(BaseModel):
-    codes: List[List[str]]
+    codes: Dict
