@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from sqlalchemy.orm import Session
-from starlette.status import HTTP_204_NO_CONTENT, HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN, HTTP_404_NOT_FOUND
 from dependencies import get_db, get_current_user, get_fx_service
 from models.core.user import User
 from models.core.expense import Expense
@@ -58,7 +57,7 @@ def get_expense(
         )
     
     if expense.user_id != user.user_id:
-        logger.warning("User is not authorized to access the event they tried to fetch")
+        logger.warning("User is not authorized to access the expense they tried to fetch")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
@@ -126,6 +125,7 @@ async def add_expense(
     db.commit()
     db.refresh(new_expense)
 
+    logger.info(f"User added new expense {new_expense.expense_id}")
     return new_expense
 
 
@@ -145,7 +145,7 @@ async def update_expense(
     if expense is None:
         logger.warning("User is trying to update an nonexisting expense")
         raise HTTPException(
-            status_code=HTTP_404_NOT_FOUND,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail={
                 "status": "NONEXISTENT_EXPENSE",
                 "message": "User tried to update an expense that does not exist"
@@ -155,7 +155,7 @@ async def update_expense(
     if expense.user_id != user.user_id:
         logger.warning("User is not authorized to edit the expense")
         raise HTTPException(
-            status_code=HTTP_403_FORBIDDEN,
+            status_code=status.HTTP_403_FORBIDDEN,
             detail={
                 "status": "UNAUTHORIZED_EXPENSE_UPDATE",
                 "message": "User not authorized to edit expense"
@@ -179,7 +179,7 @@ async def update_expense(
     
     if (expense_updates.bulk is not None):
         expense.bulk = expense_updates.bulk
-        if expense.date.day != 1:
+        if (expense.date.day != 1) and (expense.bulk):
             expense.date = date(expense.date.year, expense.date.month, 1)
         updated = True
     
@@ -188,7 +188,7 @@ async def update_expense(
         updated = True
     
     amount_or_currency_change = False
-    if (expense_updates.currency is not None) and (expense_updates.expense_category != ""):
+    if (expense_updates.currency is not None) and (expense_updates.currency != ""):
         available_currencies = await fx_service.get_supported_codes()
         expense_updates.currency = normalize_string(expense_updates.currency)
         if expense_updates.currency not in available_currencies:
@@ -238,7 +238,7 @@ def delete_expense(
     if expense is None:
         logger.warning("User is trying to delete an nonexisting expense")
         raise HTTPException(
-            status_code=HTTP_404_NOT_FOUND,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail={
                 "status": "NONEXISTENT_EXPENSE",
                 "message": "User tried to delete an expense that does not exist"
@@ -248,7 +248,7 @@ def delete_expense(
     if expense.user_id != user.user_id:
         logger.warning("User is not authorized to delete the expense")
         raise HTTPException(
-            status_code=HTTP_403_FORBIDDEN,
+            status_code=status.HTTP_403_FORBIDDEN,
             detail={
                 "status": "UNAUTHORIZED_EXPENSE_DELETE",
                 "message": "User not authorized to delete expense"
@@ -258,4 +258,4 @@ def delete_expense(
     db.delete(expense)
     db.commit()
     logger.info(f"User delete expense {expense_id} request is successful")
-    return Response(status_code=HTTP_204_NO_CONTENT)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
