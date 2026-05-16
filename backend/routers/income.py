@@ -187,7 +187,6 @@ async def update_income(
         income.source = income_updates.source
         updated = True
     
-    amount_or_currency_change = False
     if (income_updates.currency is not None) and (income_updates.currency != ""):
         available_currencies = await fx_service.get_supported_codes()
         income_updates.currency = normalize_string(income_updates.currency)
@@ -201,22 +200,19 @@ async def update_income(
                 }
             )
         income.currency = income_updates.currency
-        amount_or_currency_change = True
         updated = True
     
     if (income_updates.original_amount is not None):
         income.original_amount = income_updates.original_amount
-        amount_or_currency_change = True
         updated = True
     
-    if amount_or_currency_change:
+
+    if updated:
+        # Always convert since any change affects date, currency or amount values
         converted_amount_and_rate = await fx_service.convert(db, income.currency, "USD", income.original_amount, income.date)
         income.usd_amount = converted_amount_and_rate['amount']
         income.fx_rate_to_usd = converted_amount_and_rate['rate']
         income.fx_date = income.date
-    
-
-    if updated:
         db.commit()
         db.refresh(income)
         logger.info(f"User updated income {income_id}")

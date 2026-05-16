@@ -187,7 +187,6 @@ async def update_expense(
         expense.expense_category = expense_updates.expense_category
         updated = True
     
-    amount_or_currency_change = False
     if (expense_updates.currency is not None) and (expense_updates.currency != ""):
         available_currencies = await fx_service.get_supported_codes()
         expense_updates.currency = normalize_string(expense_updates.currency)
@@ -201,22 +200,19 @@ async def update_expense(
                 }
             )
         expense.currency = expense_updates.currency
-        amount_or_currency_change = True
         updated = True
     
     if (expense_updates.original_amount is not None):
         expense.original_amount = expense_updates.original_amount
-        amount_or_currency_change = True
         updated = True
 
-    if amount_or_currency_change:
+
+    if updated:
+        # Always convert since any change affects date, currency or amount values
         converted_amount_and_rate = await fx_service.convert(db, expense.currency, "USD", expense.original_amount, expense.date)
         expense.usd_amount = converted_amount_and_rate['amount']
         expense.fx_rate_to_usd = converted_amount_and_rate['rate']
         expense.fx_date = expense.date
-
-
-    if updated:
         db.commit()
         db.refresh(expense)
         logger.info(f"User updated expense {expense_id}")
