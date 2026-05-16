@@ -2,7 +2,7 @@ import httpx
 from sqlalchemy.orm import Session
 from models.core.fx_rate import FXRate
 from decimal import Decimal
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from utils.logger import logger
 from utils.helpers import normalize_string
 from dotenv import load_dotenv
@@ -15,6 +15,8 @@ FALLBACK_URL = os.getenv("FALLBACK_URL")
 class FXService():
     def __init__(self):
         self.client = httpx.AsyncClient(timeout=10.0)
+        self._supported_codes_cache = None
+        self._supported_codes_cache_expiry = None
         logger.info("Connecting to httpx async client")
     
     async def get_rate(
@@ -124,13 +126,27 @@ class FXService():
             "aed": "Emirati Dirham",
             ...
         }
+
+        Returns cached results if not expired yet to avoid
+        connection error
         """
         
+        now = datetime.now(timezone.utc)
+        if  (self._supported_codes_cache is not None) and \
+            (self._supported_codes_cache_expiry is not None) and \
+            (now < self._supported_codes_cache_expiry):
+            logger.info("Returning cached codes")
+            return self._supported_codes_cache
+
+
         url = f"{FX_API_BASE_URL}@latest/v1/currencies.json"
         response = await self.client.get(url)
         response.raise_for_status()
 
         data = response.json()
+
+        self._supported_codes_cache = data
+        self._supported_codes_cache_expiry = now + timedelta(hours=24)
 
         logger.info("Fetched codes successfully")
         return data
