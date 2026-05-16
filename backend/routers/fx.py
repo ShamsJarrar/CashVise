@@ -20,10 +20,10 @@ async def get_rate(
     fx_service: FXService = Depends(get_fx_service)
 ):
 
-    rate = await fx_service.get_rate(db, from_currency, to_currency, date_of_rate)
+    data = await fx_service.get_rate(db, from_currency, to_currency, date_of_rate)
 
     logger.info(f"Returning exchange rate for {from_currency}-{to_currency}")
-    return FXRate(rate=rate)
+    return FXRate(fx_date= data['fx_date'], rate=data['rate'])
 
 
 @router.get('/convert-amount', response_model=ConversionResponse)
@@ -40,7 +40,7 @@ async def get_conversion(
     data = await fx_service.convert(db, from_currency, to_currency, amount, date_of_rate)
 
     logger.info(f"Returning converted amount and rate for {from_currency}-{to_currency}")
-    return ConversionResponse(rate=data['rate'], amount=data['amount'])
+    return ConversionResponse(fx_date= data['fx_date'], rate=data['rate'], amount=data['amount'])
 
 
 @router.get('/codes', response_model=SupportedCodes)

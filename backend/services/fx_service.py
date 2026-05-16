@@ -25,7 +25,7 @@ class FXService():
         from_currency: str,
         to_currency: str,
         date_of_rate: date
-    ) -> Decimal:
+    ) -> dict:
         """
         Get exchange rate for given currency and date
 
@@ -35,7 +35,7 @@ class FXService():
         - date_of_rate: date to get rate for
 
         Returns:
-        - exchange rate value
+        - {'fx_date': date, 'rate': decimal}
         """
 
         from_currency = normalize_string(from_currency)
@@ -50,7 +50,10 @@ class FXService():
 
         if exists:
             logger.info("FX Rate already exists")
-            return exists.rate
+            return {
+                    'fx_date': exists.rate_date,
+                    'rate': exists.rate
+                }
 
         urls = []
         if date_of_rate == date.today():
@@ -67,20 +70,24 @@ class FXService():
                 response.raise_for_status()
                 data = response.json()
 
+                fX_date = date.fromisoformat(data['date'])
                 rate = Decimal(str(data[f"{from_currency}"][f"{to_currency}"]))
 
                 new_rate = FXRate(
                     original_currency=from_currency,
                     to_currency=to_currency,
                     rate=rate,
-                    rate_date=date_of_rate
+                    rate_date=fX_date
                 )
                 db.add(new_rate)
                 db.commit()
                 db.refresh(new_rate)
 
                 logger.info("Fetched rate successfully")
-                return rate
+                return {
+                    'fx_date': fX_date,
+                    'rate': rate
+                }
             except httpx.HTTPError as e:
                 logger.warning(f"Failed to fetch {url}")
     
@@ -103,15 +110,16 @@ class FXService():
         - date_of_rate: date to get rate for
 
         Return:
-        - {'rate': decimal, 'amount': decimal}
+        - {'fx_date': date, 'rate': decimal, 'amount': decimal}
         """
 
-        rate = await self.get_rate(db, from_currency, to_currency, date_of_rate)
-        converted_amount = amount*rate
+        response = await self.get_rate(db, from_currency, to_currency, date_of_rate)
+        converted_amount = amount*response['rate']
 
         logger.info("Fetched rate and converted successfully")
         return {
-            'rate': rate,
+            'fx_date': response['fx_date'],
+            'rate': response['rate'],
             'amount': converted_amount
         }
 

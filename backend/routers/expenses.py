@@ -107,7 +107,7 @@ async def add_expense(
         if expense.date.day != 1:
             expense.date = date(expense.date.year, expense.date.month, 1)
     
-    converted_amount_and_rate = await fx_service.convert(db, expense.currency, "USD", expense.original_amount, expense.date)
+    response = await fx_service.convert(db, expense.currency, "USD", expense.original_amount, expense.date)
 
     new_expense = Expense(
         user_id=user.user_id,
@@ -116,9 +116,9 @@ async def add_expense(
         expense_category=expense.expense_category,
         currency=expense.currency,
         original_amount=expense.original_amount,
-        usd_amount=converted_amount_and_rate['amount'],
-        fx_rate_to_usd=converted_amount_and_rate['rate'],
-        fx_date=expense.date,
+        usd_amount=response['amount'],
+        fx_rate_to_usd=response['rate'],
+        fx_date=response['fx_date'],
         recurrence_series_id=expense.recurrence_series_id,
     )
     db.add(new_expense)
@@ -209,10 +209,10 @@ async def update_expense(
 
     if updated:
         # Always convert since any change affects date, currency or amount values
-        converted_amount_and_rate = await fx_service.convert(db, expense.currency, "USD", expense.original_amount, expense.date)
-        expense.usd_amount = converted_amount_and_rate['amount']
-        expense.fx_rate_to_usd = converted_amount_and_rate['rate']
-        expense.fx_date = expense.date
+        response = await fx_service.convert(db, expense.currency, "USD", expense.original_amount, expense.date)
+        expense.usd_amount = response['amount']
+        expense.fx_rate_to_usd = response['rate']
+        expense.fx_date = response['fx_date']
         db.commit()
         db.refresh(expense)
         logger.info(f"User updated expense {expense_id}")

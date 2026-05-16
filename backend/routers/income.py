@@ -107,7 +107,7 @@ async def add_income(
         if income.date.day != 1:
             income.date = date(income.date.year, income.date.month, 1)
     
-    converted_amount_and_rate = await fx_service.convert(db, income.currency, "USD", income.original_amount, income.date)
+    response = await fx_service.convert(db, income.currency, "USD", income.original_amount, income.date)
 
     new_income = Income(
         user_id=user.user_id,
@@ -116,9 +116,9 @@ async def add_income(
         source=income.source,
         currency=income.currency,
         original_amount=income.original_amount,
-        usd_amount=converted_amount_and_rate['amount'],
-        fx_rate_to_usd=converted_amount_and_rate['rate'],
-        fx_date=income.date,
+        usd_amount=response['amount'],
+        fx_rate_to_usd=response['rate'],
+        fx_date=response['fx_date'],
         recurrence_series_id=income.recurrence_series_id
     )
     db.add(new_income)
@@ -209,10 +209,10 @@ async def update_income(
 
     if updated:
         # Always convert since any change affects date, currency or amount values
-        converted_amount_and_rate = await fx_service.convert(db, income.currency, "USD", income.original_amount, income.date)
-        income.usd_amount = converted_amount_and_rate['amount']
-        income.fx_rate_to_usd = converted_amount_and_rate['rate']
-        income.fx_date = income.date
+        response = await fx_service.convert(db, income.currency, "USD", income.original_amount, income.date)
+        income.usd_amount = response['amount']
+        income.fx_rate_to_usd = response['rate']
+        income.fx_date = response['fx_date']
         db.commit()
         db.refresh(income)
         logger.info(f"User updated income {income_id}")
