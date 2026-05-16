@@ -2,12 +2,14 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
-from dependencies import get_db, get_current_user
+from dependencies import get_db, get_current_user, get_fx_service
 from models.core.user import User
 from models.core.user_insight_pref import UserInsightPref
 from models.core.insight_class import InsightClass
 from schemas.core.user import UserResponse, UserUpdate
 from schemas.core.user_insight_pref import UserInsightPrefUpdate, UserInsightPrefResponse
+from services.fx_service import FXService
+from utils.helpers import normalize_string
 from utils.logger import logger
 from typing import List
 
@@ -15,10 +17,11 @@ router = APIRouter(prefix='/settings', tags=["Settings"])
 
 
 @router.patch('/update-user-info', response_model=UserResponse)
-def update_user_info(
+async def update_user_info(
     updated_info: UserUpdate,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
+    user: User = Depends(get_current_user),
+    fx_service: FXService = Depends(get_fx_service)
 ):
 
     updated = False
@@ -36,6 +39,17 @@ def update_user_info(
         updated = True
     
     if (updated_info.preferred_currency is not None) and (updated_info.preferred_currency != ""):
+        available_currencies = await fx_service.get_supported_codes()
+        updated_info.preferred_currency = normalize_string(updated_info.preferred_currency)
+        if updated_info.preferred_currency not in available_currencies:
+            logger.warning("User preferred currency is unsupported!")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "status": "UNSUPPORTED_CURRENCY",
+                    "message": "User preferred currency is unsupported"
+                }
+            )
         user.preferred_currency = updated_info.preferred_currency
         updated = True
     

@@ -1,8 +1,10 @@
+from locale import normalize
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from dependencies import get_db, get_current_user
+from sqlalchemy.orm.session import DEACTIVE
+from dependencies import get_db, get_current_user, get_fx_service
 from models.core.user import User
 from schemas.core.user import UserCreate, UserResponse, UserLogin, TokenWithUserResponse, UserPasswordChange, UserEmailChange
 from schemas.core.token import OTPVerifyRequest, ResendOTPRequest, TokenResponse
@@ -10,13 +12,18 @@ from utils.helpers import normalize_string
 from utils.logger import logger
 from utils.security import hash_password, generate_otp, hash_otp, verify_password, create_access_token, verify_otp
 from services.email_service import send_otp
+from services.fx_service import FXService
 from datetime import datetime, timedelta, timezone
 
 router = APIRouter(prefix='/auth', tags=['Auth'])
 
 
 @router.post('/register', response_model=UserResponse)
-def register(user: UserCreate, db: Session = Depends(get_db)):
+async def register(
+    user: UserCreate, 
+    db: Session = Depends(get_db), 
+    fx_service: FXService = Depends(get_fx_service)
+):
     email = normalize_string(user.email)
     name = user.name
 
@@ -43,6 +50,17 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
             }
         )
 
+    available_currencies = await fx_service.get_supported_codes()
+    user.preferred_currency = normalize_string(user.preferred_currency)
+    if user.preferred_currency not in available_currencies:
+        logger.warning("User preferred currency is unsupported!")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "status": "UNSUPPORTED_CURRENCY",
+                "message": "User preferred currency is unsupported"
+            }
+        )
 
     password = hash_password(user.password)
     otp = generate_otp()
