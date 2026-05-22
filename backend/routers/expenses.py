@@ -1,73 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from dependencies import get_db, get_current_user, get_fx_service
 from models.core.user import User
 from models.core.expense import Expense
-from schemas.core.expense import ExpenseCreate, ExpenseResponse, ExpenseUpdate
+from schemas.core.expense import ExpenseCreate, ExpenseResponse, ExpenseUpdate, ExpensesTotal
 from services.fx_service import FXService
 from utils.helpers import normalize_string
 from utils.logger import logger
 from typing import List, Optional
 from datetime import date
+from dateutil.relativedelta import relativedelta
 
 router = APIRouter(prefix='/expenses', tags=['Expenses'])
-
-@router.get('/', response_model=List[ExpenseResponse])
-def get_expenses(
-    start_date: Optional[date] = Query(None),
-    end_date: Optional[date] = Query(None),
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-
-    date_filters = []
-    if start_date is not None:
-        date_filters.append(Expense.date >= start_date)
-    
-    if end_date is not None:
-        date_filters.append(Expense.date <= end_date)
-
-    expenses = db.query(Expense).filter(
-        Expense.user_id == user.user_id,
-        *date_filters
-    ).all()
-
-    return expenses
-
-
-@router.get('/{expense_id}', response_model=ExpenseResponse)
-def get_expense(
-    expense_id: int,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
-):
-
-    expense = db.query(Expense).filter(
-        Expense.expense_id == expense_id
-    ).first()
-
-    if expense is None:
-        logger.warning("User tried to fetch expense using expense_id, but expenses does not exist")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={
-                "status": "EXPENSE_NOT_FOUND",
-                "message": "Expense you tried to fetch does not exist"
-            }
-        )
-    
-    if expense.user_id != user.user_id:
-        logger.warning("User is not authorized to access the expense they tried to fetch")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={
-                "status": "FORBIDDEN_ACCESS_TO_EXPENSE",
-                "message": "User is not authorized to access the expense"
-            }
-        )
-    
-    return expense
-
 
 @router.post('/', response_model=ExpenseResponse)
 async def add_expense(
@@ -127,6 +72,99 @@ async def add_expense(
 
     logger.info(f"User added new expense {new_expense.expense_id}")
     return new_expense
+
+
+@router.get('/', response_model=List[ExpenseResponse])
+def get_expenses(
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+
+    date_filters = []
+    if start_date is not None:
+        date_filters.append(Expense.date >= start_date)
+    
+    if end_date is not None:
+        date_filters.append(Expense.date <= end_date)
+
+    expenses = db.query(Expense).filter(
+        Expense.user_id == user.user_id,
+        *date_filters
+    ).all()
+
+    return expenses
+
+
+@router.get('/month-total', response_model=ExpensesTotal)
+async def get_total_monthly_expenses(
+    month: int = Query(..., ge=1, le=12),
+    year: int = Query(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    fx_service: FXService = Depends(get_fx_service)
+):
+
+    if (year > date.today().year) or ((year == date.today().year) and (month > date.today().month)):
+        logger.warning("User used future date for fetching total expenses")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "status": "FUTURE_TOTAL_EXPENSES_NOT_ALLOWED",
+                "message": "User is not allowed to fetch future total expenses"
+            }
+        )
+
+    start_date = date(year, month, 1)
+    end_date = start_date + relativedelta(months=1)
+    usd_monthly_total = db.query(func.sum(Expense.usd_amount)).filter(
+        Expense.user_id == user.user_id,
+        Expense.date >= start_date,
+        Expense.date < end_date
+    ).scalar()
+
+    preferred_currency_monthly_total = await fx_service.convert(db=db, from_currency='usd', to_currency=user.preferred_currency, amount=usd_monthly_total, date_of_rate=date.today())
+
+    return ExpensesTotal(
+        preferred_currency=user.preferred_currency,
+        pref_currency_total_expenses=preferred_currency_monthly_total['amount'],
+        usd_total_expenses=usd_monthly_total
+    )
+
+
+@router.get('/{expense_id}', response_model=ExpenseResponse)
+def get_expense(
+    expense_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+
+    expense = db.query(Expense).filter(
+        Expense.expense_id == expense_id
+    ).first()
+
+    if expense is None:
+        logger.warning("User tried to fetch expense using expense_id, but expenses does not exist")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "status": "EXPENSE_NOT_FOUND",
+                "message": "Expense you tried to fetch does not exist"
+            }
+        )
+    
+    if expense.user_id != user.user_id:
+        logger.warning("User is not authorized to access the expense they tried to fetch")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "status": "FORBIDDEN_ACCESS_TO_EXPENSE",
+                "message": "User is not authorized to access the expense"
+            }
+        )
+    
+    return expense
 
 
 @router.patch('/{expense_id}', response_model=ExpenseResponse)

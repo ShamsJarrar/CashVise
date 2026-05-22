@@ -31,3 +31,8 @@ class ExpenseUpdate(BaseModel):
     expense_category: Optional[str] = None
     currency: Optional[str] = None
     original_amount: Optional[Decimal] = None
+
+class ExpensesTotal(BaseModel):
+    preferred_currency: str
+    pref_currency_total_expenses: Decimal
+    usd_total_expenses: Decimal

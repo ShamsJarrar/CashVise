@@ -1,73 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from dependencies import get_db, get_current_user, get_fx_service
 from models.core.user import User
 from models.core.income import Income
-from schemas.core.income import IncomeCreate, IncomeResponse, IncomeUpdate
+from schemas.core.income import IncomeCreate, IncomeResponse, IncomeUpdate, IncomeTotal
 from services.fx_service import FXService
 from utils.helpers import normalize_string
 from utils.logger import logger
 from typing import List, Optional
 from datetime import date
+from dateutil.relativedelta import relativedelta
 
 router = APIRouter(prefix='/income', tags=['Income'])
-
-@router.get('/', response_model=List[IncomeResponse])
-def get_all_income(
-    start_date: Optional[date] = Query(None),
-    end_date: Optional[date] = Query(None),
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
-):
-
-    date_filters = []
-    if start_date is not None:
-        date_filters.append(Income.date >= start_date)
-    
-    if end_date is not None:
-        date_filters.append(Income.date <= end_date)
-
-    income = db.query(Income).filter(
-        Income.user_id == user.user_id,
-        *date_filters
-    ).all()
-
-    return income
-
-
-@router.get('/{income_id}', response_model=IncomeResponse)
-def get_income(
-    income_id: int,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
-):
-
-    income = db.query(Income).filter(
-        Income.income_id == income_id
-    ).first()
-
-    if income is None:
-        logger.warning("User tried to fetch income using income_id, but income does not exist")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={
-                "status": "INCOME_NOT_FOUND",
-                "message": "User tried to fetch nonexistent income row"
-            }
-        )
-    
-    if income.user_id != user.user_id:
-        logger.warning("User is not authorized to access the income they tried to fetch")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={
-                "status": "FORBIDDEN_ACCESS_TO_INCOME",
-                "message": "User is not authorized to access the income fielf"
-            }
-        )
-    
-    return income
-
 
 @router.post('/', response_model=IncomeResponse)
 async def add_income(
@@ -127,6 +72,99 @@ async def add_income(
 
     logger.info(f"User added new income {new_income.income_id}")
     return new_income
+
+
+@router.get('/', response_model=List[IncomeResponse])
+def get_all_income(
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+
+    date_filters = []
+    if start_date is not None:
+        date_filters.append(Income.date >= start_date)
+    
+    if end_date is not None:
+        date_filters.append(Income.date <= end_date)
+
+    income = db.query(Income).filter(
+        Income.user_id == user.user_id,
+        *date_filters
+    ).all()
+
+    return income
+
+
+@router.get('/month-total', response_model=IncomeTotal)
+async def get_total_monthly_income(
+    month: int = Query(..., ge=1, le=12),
+    year: int = Query(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    fx_service: FXService = Depends(get_fx_service)
+):
+
+    if (year > date.today().year) or ((year == date.today().year) and (month > date.today().month)):
+        logger.warning("User used future date for fetching total income")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "status": "FUTURE_TOTAL_INCOME_NOT_ALLOWED",
+                "message": "User is not allowed to fetch future total income"
+            }
+        )
+
+    start_date = date(year, month, 1)
+    end_date = start_date + relativedelta(months=1)
+    usd_monthly_total = db.query(func.sum(Income.usd_amount)).filter(
+        Income.user_id == user.user_id,
+        Income.date >= start_date,
+        Income.date < end_date
+    ).scalar()
+
+    preferred_currency_monthly_total = await fx_service.convert(db=db, from_currency='usd', to_currency=user.preferred_currency, amount=usd_monthly_total, date_of_rate=date.today())
+
+    return IncomeTotal(
+        preferred_currency=user.preferred_currency,
+        pref_currency_total_income=preferred_currency_monthly_total['amount'],
+        usd_total_income=usd_monthly_total
+    )
+
+
+@router.get('/{income_id}', response_model=IncomeResponse)
+def get_income(
+    income_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+
+    income = db.query(Income).filter(
+        Income.income_id == income_id
+    ).first()
+
+    if income is None:
+        logger.warning("User tried to fetch income using income_id, but income does not exist")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "status": "INCOME_NOT_FOUND",
+                "message": "User tried to fetch nonexistent income row"
+            }
+        )
+    
+    if income.user_id != user.user_id:
+        logger.warning("User is not authorized to access the income they tried to fetch")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "status": "FORBIDDEN_ACCESS_TO_INCOME",
+                "message": "User is not authorized to access the income fielf"
+            }
+        )
+    
+    return income
 
 
 @router.patch('/{income_id}', response_model=IncomeResponse)

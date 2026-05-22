@@ -70,14 +70,29 @@ class FXService():
                 response.raise_for_status()
                 data = response.json()
 
-                fX_date = date.fromisoformat(data['date'])
+                fx_date = date.fromisoformat(data['date'])
                 rate = Decimal(str(data[f"{from_currency}"][f"{to_currency}"]))
 
+                # For cases when the fx api doesn't have updates rates for today,
+                # and returns previous days rates
+                exists = db.query(FXRate).filter(
+                    FXRate.original_currency == from_currency,
+                    FXRate.to_currency == to_currency,
+                    FXRate.rate_date == fx_date
+                ).first()
+
+                if exists:
+                    logger.info("FX Rate already exists")
+                    return {
+                            'fx_date': exists.rate_date,
+                            'rate': exists.rate
+                        }
+                
                 new_rate = FXRate(
                     original_currency=from_currency,
                     to_currency=to_currency,
                     rate=rate,
-                    rate_date=fX_date
+                    rate_date=fx_date
                 )
                 db.add(new_rate)
                 db.commit()
@@ -85,7 +100,7 @@ class FXService():
 
                 logger.info("Fetched rate successfully")
                 return {
-                    'fx_date': fX_date,
+                    'fx_date': fx_date,
                     'rate': rate
                 }
             except httpx.HTTPError as e:

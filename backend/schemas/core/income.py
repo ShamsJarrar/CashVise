@@ -31,3 +31,8 @@ class IncomeUpdate(BaseModel):
     source: Optional[str] = None
     currency: Optional[str] = None
     original_amount: Optional[Decimal] = None
+
+class IncomeTotal(BaseModel):
+    preferred_currency: str
+    pref_currency_total_income: Decimal
+    usd_total_income: Decimal
