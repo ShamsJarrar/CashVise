@@ -97,16 +97,28 @@ def get_all_income(
     return income
 
 
-@router.get('/month-total', response_model=IncomeTotal)
-async def get_total_monthly_income(
-    month: int = Query(..., ge=1, le=12),
+@router.get('/total', response_model=IncomeTotal)
+async def get_total_income(
+    yearly: bool = Query(...),
     year: int = Query(...),
+    month: int | None = Query(None, ge=1, le=12),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
     fx_service: FXService = Depends(get_fx_service)
 ):
 
-    if (year > date.today().year) or ((year == date.today().year) and (month > date.today().month)):
+    if (not yearly) and (month is None):
+        logger.warning("User requested montly income but didn't enter month")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "status": "MONTH_REQUIRED_FOR_MONTLY_INCOME",
+                "message": "Month is required for monthly total income"
+            }
+        )
+    
+    if (year > date.today().year) or \
+        ((not yearly) and (year == date.today().year) and (month > date.today().month)):
         logger.warning("User used future date for fetching total income")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -116,20 +128,40 @@ async def get_total_monthly_income(
             }
         )
 
-    start_date = date(year, month, 1)
-    end_date = start_date + relativedelta(months=1)
-    usd_monthly_total = db.query(func.sum(Income.usd_amount)).filter(
+    if yearly:
+        start_date = date(year, 1, 1)
+        end_date = start_date + relativedelta(years=1)
+    else:
+        start_date = date(year, month, 1)
+        end_date = start_date + relativedelta(months=1)
+    
+    usd_total = db.query(func.sum(Income.usd_amount)).filter(
         Income.user_id == user.user_id,
         Income.date >= start_date,
         Income.date < end_date
     ).scalar()
 
-    preferred_currency_monthly_total = await fx_service.convert(db=db, from_currency='usd', to_currency=user.preferred_currency, amount=usd_monthly_total, date_of_rate=date.today())
+    if usd_total is None:
+        logger.info("No income exist for Month/Year")
+        return IncomeTotal(
+            preferred_currency=user.preferred_currency,
+            pref_currency_total_income=0.0,
+            usd_total_income=0.0
+        )
 
+    preferred_currency_total = await fx_service.convert(
+        db=db, 
+        from_currency='usd', 
+        to_currency=user.preferred_currency, 
+        amount=usd_total, 
+        date_of_rate=date.today()
+    )
+
+    logger.info("Returning Income Total")
     return IncomeTotal(
         preferred_currency=user.preferred_currency,
-        pref_currency_total_income=preferred_currency_monthly_total['amount'],
-        usd_total_income=usd_monthly_total
+        pref_currency_total_income=preferred_currency_total['amount'],
+        usd_total_income=usd_total
     )
 
 
